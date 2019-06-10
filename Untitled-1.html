@@ -1,0 +1,549 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>3d相册天空飞舞-浪漫分享网</title>
+<style type="text/css">
+	html {
+		overflow: hidden;
+	}
+	body {
+	position: absolute;
+	margin: 0px;
+	padding: 0px;
+	background: #111;
+	width: 100%;
+	height: 100%;
+	background-color: #FFFFFF;
+	}
+	#screen {
+	position: absolute;
+	left: 10%;
+	top: 10%;
+	width: 90%;
+	height: 70%;
+	background: #000;
+	background-color: #FFFFFF;
+	background-image: url(u=2970694898,4027737303&fm=26&gp=0.jpg);
+	overflow: visible;
+	}
+	#screen img {
+		position: absolute;
+		cursor: pointer;
+		visibility: hidden;
+		width: 0px;
+		height: 0px;
+	}
+	#screen .tvover {
+		border: solid #876;
+		opacity: 1;
+		filter: alpha(opacity=100);
+	}
+	#screen .tvout {
+		border: solid #fff;
+		opacity: 0.7;
+	}
+	#bankImages {
+		display: none;
+	}
+</style>
+<link href="css/layout.css" rel="stylesheet" type="text/css" />
+<link href="css/slider.css" rel="stylesheet" type="text/css" />
+<link rel="stylesheet" href="css/reset.css">
+<link rel="stylesheet" href="css/style.css" media="screen" type="text/css" />
+</head>
+<body>
+<script type="text/javascript">
+var Library = {};
+Library.ease = function () {
+	this.target = 0;
+	this.position = 0;
+	this.move = function (target, speed)
+	{
+		this.position += (target - this.position) * speed;
+	}
+}
+
+var tv = {
+	/* ==== variables ==== */
+	O : [],
+	screen : {},
+	grid : {
+		size       : 4,  // 4x4 grid
+		borderSize : 6,  // borders size
+		zoomed     : false
+	},
+	angle : {
+		x : new Library.ease(),
+		y : new Library.ease()
+	},
+	camera : {
+		x    : new Library.ease(),
+		y    : new Library.ease(),
+		zoom : new Library.ease(),
+		focalLength : 750 // camera Focal Length
+	},
+
+	/* ==== init script ==== */
+	init : function ()
+	{
+		this.screen.obj = document.getElementById('screen');
+		var img = document.getElementById('bankImages').getElementsByTagName('img');
+		this.screen.obj.onselectstart = function () { return false; }
+		this.screen.obj.ondrag        = function () { return false; }
+		/* ==== create images grid ==== */
+		var ni = 0;
+		var n = (tv.grid.size / 2) - .5;
+		for (var y = -n; y <= n; y++)
+		{
+			for (var x = -n; x <= n; x++)
+			{
+				/* ==== create HTML image element ==== */
+				var o = document.createElement('img');
+				var i = img[(ni++) % img.length];
+				o.className = 'tvout';
+				o.src = i.src;
+				tv.screen.obj.appendChild(o);
+				/* ==== 3D coordinates ==== */
+				o.point3D = {
+					x  : x,
+					y  : y,
+					z  : new Library.ease()
+				};
+				/* ==== push object ==== */
+				o.point2D = {};
+				o.ratioImage = 1;
+				tv.O.push(o);
+				/* ==== on mouse over event ==== */
+				o.onmouseover = function ()
+				{
+					if (!tv.grid.zoomed)
+					{
+						if (tv.o)
+						{
+							/* ==== mouse out ==== */
+							tv.o.point3D.z.target = 0;
+							tv.o.className = 'tvout';
+						}
+						/* ==== mouse over ==== */
+						this.className = 'tvover';
+						this.point3D.z.target = -.5;
+						tv.o = this;
+					}
+				}
+				/* ==== on click event ==== */
+				o.onclick = function ()
+				{
+					if (!tv.grid.zoomed)
+					{
+						/* ==== zoom in ==== */
+						tv.camera.x.target = this.point3D.x;
+						tv.camera.y.target = this.point3D.y;
+						tv.camera.zoom.target = tv.screen.w * 1.25;
+						tv.grid.zoomed = this;
+					} else {
+						if (this == tv.grid.zoomed){
+							/* ==== zoom out ==== */
+							tv.camera.x.target = 0;
+							tv.camera.y.target = 0;
+							tv.camera.zoom.target = tv.screen.w / (tv.grid.size + .1);
+							tv.grid.zoomed = false;
+						}
+					}
+				}
+				/* ==== 3D transform function ==== */
+				o.calc = function ()
+				{
+					/* ==== ease mouseover ==== */
+					this.point3D.z.move(this.point3D.z.target, .5);
+					/* ==== assign 3D coords ==== */
+					var x = (this.point3D.x - tv.camera.x.position) * tv.camera.zoom.position;
+					var y = (this.point3D.y - tv.camera.y.position) * tv.camera.zoom.position;
+					var z = this.point3D.z.position * tv.camera.zoom.position;
+					/* ==== perform rotations ==== */
+					var xy = tv.angle.cx * y  - tv.angle.sx * z;
+					var xz = tv.angle.sx * y  + tv.angle.cx * z;
+					var yz = tv.angle.cy * xz - tv.angle.sy * x;
+					var yx = tv.angle.sy * xz + tv.angle.cy * x;
+					/* ==== 2D transformation ==== */
+					this.point2D.scale = tv.camera.focalLength / (tv.camera.focalLength + yz);
+					this.point2D.x = yx * this.point2D.scale;
+					this.point2D.y = xy * this.point2D.scale;
+					this.point2D.w = Math.round(
+					                   Math.max(
+					                     0,
+					                     this.point2D.scale * tv.camera.zoom.position * .8
+					                   )
+					                 );
+					/* ==== image size ratio ==== */
+					if (this.ratioImage > 1)
+						this.point2D.h = Math.round(this.point2D.w / this.ratioImage);
+					else
+					{
+						this.point2D.h = this.point2D.w;
+						this.point2D.w = Math.round(this.point2D.h * this.ratioImage);
+					}
+				}
+				/* ==== rendering ==== */
+				o.draw = function ()
+				{
+					if (this.complete)
+					{
+						/* ==== paranoid image load ==== */
+						if (!this.loaded)
+						{
+							if (!this.img)
+							{
+								/* ==== create internal image ==== */
+								this.img = new Image();
+								this.img.src = this.src;
+							}
+							if (this.img.complete)
+							{
+								/* ==== get width / height ratio ==== */
+								this.style.visibility = 'visible';
+								this.ratioImage = this.img.width / this.img.height;
+								this.loaded = true;
+								this.img = false;
+							}
+						}
+						/* ==== HTML rendering ==== */
+						this.style.left = Math.round(
+						                    this.point2D.x * this.point2D.scale +
+						                    tv.screen.w - this.point2D.w * .5
+						                  ) + 'px';
+						this.style.top  = Math.round(
+						                    this.point2D.y * this.point2D.scale +
+						                    tv.screen.h - this.point2D.h * .5
+						                  ) + 'px';
+						this.style.width  = this.point2D.w + 'px';
+						this.style.height = this.point2D.h + 'px';
+						this.style.borderWidth = Math.round(
+						                           Math.max(
+						                             this.point2D.w,
+						                             this.point2D.h
+						                           ) * tv.grid.borderSize * .01
+						                         ) + 'px';
+						this.style.zIndex = Math.floor(this.point2D.scale * 100);
+					}
+				}
+			}
+		}
+		/* ==== start script ==== */
+		tv.resize();
+		mouse.y = tv.screen.y + tv.screen.h;
+		mouse.x = tv.screen.x + tv.screen.w;
+		tv.run();
+	},
+
+	/* ==== resize window ==== */
+	resize : function ()
+	{
+		var o = tv.screen.obj;
+		tv.screen.w = o.offsetWidth / 2;
+		tv.screen.h = o.offsetHeight / 2;
+		tv.camera.zoom.target = tv.screen.w / (tv.grid.size + .1);
+		for (tv.screen.x = 0, tv.screen.y = 0; o != null; o = o.offsetParent)
+		{
+			tv.screen.x += o.offsetLeft;
+			tv.screen.y += o.offsetTop;
+		}
+	},
+
+	/* ==== main loop ==== */
+	run : function ()
+	{
+		/* ==== motion ease ==== */
+		tv.angle.x.move(-(mouse.y - tv.screen.h - tv.screen.y) * .0025, .1);
+		tv.angle.y.move( (mouse.x - tv.screen.w - tv.screen.x) * .0025, .1);
+		tv.camera.x.move(tv.camera.x.target, tv.grid.zoomed ? .25 : .025);
+		tv.camera.y.move(tv.camera.y.target, tv.grid.zoomed ? .25 : .025);
+		tv.camera.zoom.move(tv.camera.zoom.target, .05);
+		/* ==== angles sin and cos ==== */
+		tv.angle.cx = Math.cos(tv.angle.x.position);
+		tv.angle.sx = Math.sin(tv.angle.x.position);
+		tv.angle.cy = Math.cos(tv.angle.y.position);
+		tv.angle.sy = Math.sin(tv.angle.y.position);
+		/* ==== loop through all images ==== */
+		for (var i = 0, o; o = tv.O[i]; i++)
+		{
+			o.calc();
+			o.draw();
+		}
+		/* ==== loop ==== */
+		setTimeout(tv.run, 32);
+	}
+}
+
+/* ==== global mouse position ==== */
+var mouse = {
+	x : 0,
+	y : 0
+}
+document.onmousemove = function(e)
+{
+	if (window.event) e = window.event;
+	mouse.x = e.clientX;
+	mouse.y = e.clientY;
+	return false;
+}
+
+</script>
+<hr>
+<div class="tvout" id="screen"></div>
+<div id="bankImages">
+<img alt="" src="1.jpg">
+<img alt="" src="2.jpg">
+<img alt="" src="3.jpg">
+<img alt="" src="4.jpg">
+<img alt="" src="5.jpg">
+<img alt="" src="6.jpg">
+<img alt="" src="7.jpg">
+<img alt="" src="8.jpg">
+<img alt="" src="9.jpg">
+<img alt="" src="10.jpg">
+<img alt="" src="11.jpg">
+<img alt="" src="12.jpg">
+<img alt="" src="13.jpg">
+<img alt="" src="14.jpg">
+<img alt="" src="15.jpg">
+</div>
+<script type="text/javascript">
+	/* ==== start script ==== */
+	onresize = tv.resize;
+	tv.init();
+</script>
+<br>
+<div align="center">
+<p style="color:#FFFFFF"></p>
+<p></p>
+<p style="color:#FFFFFF"></p>
+<p></p>
+</div>
+<audio src="http://sc.111ttt.com/up/mp3/254149/AFFA60BDF6A754EC61B55916B8635DD6.mp3" autoplay="autoplay">
+</audio>
+<div style="text-align:center;clear:both;position:absolute;top:30px;left:260px;z-index:999">
+  <script src="/gg_bd_ad_720x90.js" type="text/javascript"></script>
+<script src="/follow.js" type="text/javascript"></script>
+</div>
+<section class="background"></section>
+<section class="scene3d">
+<div class="cube skybox">
+<var class="scale">
+<figure class="face front"></figure>
+<figure class="face back"></figure>
+<figure class="face right"></figure>
+<figure class="face left"></figure>
+<figure class="face top"></figure>
+<figure class="face bottom"></figure>
+</var>
+</div>
+<div class="butterfly_container">
+<var class="rotate3d">
+<var class="scale">
+<var class="translate3d">
+<var class="translate3d-1">
+<figure class="butterfly">
+<svg class="wing left" viewBox="0 0 50 100" class="icon shape-codepen">
+
+</svg>
+<svg class="wing right" viewBox="0 0 50 100" class="icon shape-codepen">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+</figure>
+</var>
+</var>
+</var>
+</var>
+</div>
+<div class="butterfly_container" style="margin-top: -150px; margin-left: 140px;
+              -webkit-animation-duration: 5s;
+              -moz-animation-duration: 5s;
+              -ms-animation-duration: 5s;
+              -o-animation-duration: 5s;
+              animation-duration: 5s;">
+<var class="rotate3d">
+<var class="scale">
+<var class="translate3d">
+<var class="translate3d-1">
+<figure class="butterfly">
+<svg class="wing left" viewBox="0 0 50 100" style="-webkit-animation-duration: .75s;
+                  -moz-animation-duration: .75s;
+                  -ms-animation-duration: .75s;
+                  -o-animation-duration: .75s;
+                  animation-duration: .75s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+<svg class="wing right" viewBox="0 0 50 100" style="-webkit-animation-duration: .75s;
+                  -moz-animation-duration: .75s;
+                  -ms-animation-duration: .75s;
+                  -o-animation-duration: .75s;
+                  animation-duration: .75s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+</figure>
+</var>
+</var>
+</var>
+</var>
+</div>
+<div class="butterfly_container scale_half" style="margin-top: -10px; margin-left: 50px;
+              -webkit-animation-duration: 5s;
+              -moz-animation-duration: 5s;
+              -ms-animation-duration: 5s;
+              -o-animation-duration: 5s;
+              animation-duration: 5s;">
+<var class="rotate3d">
+<var class="scale">
+<var class="translate3d">
+<var class="translate3d-1">
+<figure class="butterfly">
+<svg class="wing left" viewBox="0 0 50 100" style="-webkit-animation-duration: .75s;
+                  -moz-animation-duration: .75s;
+                  -ms-animation-duration: .75s;
+                  -o-animation-duration: .75s;
+                  animation-duration: .75s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+<svg class="wing right" viewBox="0 0 50 100" style="-webkit-animation-duration: .75s;
+                  -moz-animation-duration: .75s;
+                  -ms-animation-duration: .75s;
+                  -o-animation-duration: .75s;
+                  animation-duration: .75s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+</figure>
+</var>
+</var>
+</var>
+</var>
+</div>
+<div class="butterfly_container scale_half" style="margin-top: 20px;
+              -webkit-animation-duration: 20s;
+              -moz-animation-duration: 20s;
+              -ms-animation-duration: 20s;
+              -o-animation-duration: 20s;
+              animation-duration: 20s;">
+<var class="rotate3d">
+<var class="scale">
+<var class="translate3d">
+<var class="translate3d-1">
+<figure class="butterfly">
+<svg class="wing left" viewBox="0 0 50 100" style="-webkit-animation-duration: 1s;
+                  -moz-animation-duration: 1s;
+                  -ms-animation-duration: 1s;
+                  -o-animation-duration: 1s;
+                  animation-duration: 1s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+<svg class="wing right" viewBox="0 0 50 100" style="-webkit-animation-duration: 1s;
+                  -moz-animation-duration: 1s;
+                  -ms-animation-duration: 1s;
+                  -o-animation-duration: 1s;
+                  animation-duration: 1s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+</figure>
+</var>
+</var>
+</var>
+</var>
+</div>
+<div class="butterfly_container scale_half" style="margin-top: 100px; margin-left: 50px;
+              -webkit-animation-duration: 20s;
+              -moz-animation-duration: 20s;
+              -ms-animation-duration: 20s;
+              -o-animation-duration: 20s;
+              animation-duration: 20s;">
+<var class="rotate3d">
+<var class="scale">
+<var class="translate3d">
+<var class="translate3d-1">
+<figure class="butterfly">
+<svg class="wing left" viewBox="0 0 50 100" style="-webkit-animation-duration: 1.2s;
+                  -moz-animation-duration: 1.2s;
+                  -ms-animation-duration: 1.2s;
+                  -o-animation-duration: 1.2s;
+                  animation-duration: 1.2s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+<svg class="wing right" viewBox="0 0 50 100" style="-webkit-animation-duration: 1.2s;
+                  -moz-animation-duration: 1.2s;
+                  -ms-animation-duration: 1.2s;
+                  -o-animation-duration: 1.2s;
+                  animation-duration: 1.2s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+</figure>
+</var>
+</var>
+</var>
+</var>
+</div>
+<div class="butterfly_container scale_third" style="margin-top: 150px;
+              -webkit-animation-duration: 20s;
+              -moz-animation-duration: 20s;
+              -ms-animation-duration: 20s;
+              -o-animation-duration: 20s;
+              animation-duration: 20s;">
+<var class="rotate3d">
+<var class="scale">
+<var class="translate3d">
+<var class="translate3d-1">
+<figure class="butterfly">
+<svg class="wing left" viewBox="0 0 50 100" style="-webkit-animation-duration: .35s;
+                  -moz-animation-duration: .35s;
+                  -ms-animation-duration: .35s;
+                  -o-animation-duration: .35s;
+                  animation-duration: .35s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+<svg class="wing right" viewBox="0 0 50 100" style="-webkit-animation-duration: .35s;
+                  -moz-animation-duration: .35s;
+                  -ms-animation-duration: .53s;
+                  -o-animation-duration: .35s;
+                  animation-duration: .35s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+</figure>
+ </var>
+</var>
+</var>
+</var>
+</div>
+<div class="butterfly_container scale_third" style="margin-top: -250px; margin-left: 300px; 
+              -webkit-animation-duration: 4s;
+              -moz-animation-duration: 4s;
+              -ms-animation-duration: 4s;
+              -o-animation-duration: 4s;
+              animation-duration: 4s;">
+<var class="rotate3d">
+<var class="scale">
+<var class="translate3d">
+<var class="translate3d-1">
+<figure class="butterfly">
+<svg class="wing left" viewBox="0 0 50 100" style="-webkit-animation-duration: .45s;
+                  -moz-animation-duration: .45s;
+                  -ms-animation-duration: .45s;
+                  -o-animation-duration: .45s;
+                  animation-duration: .45s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+<svg class="wing right" viewBox="0 0 50 100" style="-webkit-animation-duration: .45s;
+                  -moz-animation-duration: .45s;
+                  -ms-animation-duration: .45s;
+                  -o-animation-duration: .45s;
+                  animation-duration: .45s;">
+<use class="left" xlink:href="#shape-butterfly-1"></use>
+</svg>
+</figure>
+</var>
+</var>
+</var>
+</var>
+</div>
+</section>
+<script type="text/javascript"  src="https://idm-su.baidu.com/su.js"></script>
+</body>
+</html>
